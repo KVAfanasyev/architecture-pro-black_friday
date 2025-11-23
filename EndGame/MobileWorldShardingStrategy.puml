@@ -1,0 +1,68 @@
+@startuml MobileWorld_Sharding_Strategy
+
+package "Географическое шардирование" {
+  database "Шард Москва" as ShardMsk {
+    [Inventory\nМосква] as InvMsk
+    [Orders\nМосква] as OrdMsk
+  }
+
+  database "Шард Екатеринбург" as ShardEkb {
+    [Inventory\nЕкатеринбург] as InvEkb
+    [Orders\nЕкатеринбург] as OrdEkb
+  }
+
+  database "Шард СПб" as ShardSpb {
+    [Inventory\nСПб] as InvSpb
+    [Orders\nСПб] as OrdSpb
+  }
+}
+
+package "Категорийное шардирование" {
+  database "Шард Электроника" as ShardElectro {
+    [Products\nСмартфоны] as ProdPhones
+    [Products\nНоутбуки] as ProdLaptops
+  }
+
+  database "Шард Аксессуары" as ShardAccessories {
+    [Products\nЧехлы] as ProdCases
+    [Products\nНаушники] as ProdHeadphones
+  }
+}
+
+package "Сессионное шардирование" {
+  database "Шард Сессий A-M" as ShardSessionsAM {
+    [Carts\nsession_id A-M] as CartsAM
+  }
+
+  database "Шард Сессий N-Z" as ShardSessionsNZ {
+    [Carts\nsession_id N-Z] as CartsNZ
+  }
+}
+
+' Data flow
+[Клиент Москва] --> InvMsk : запросы остатков
+[Клиент Екатеринбург] --> InvEkb : запросы остатков
+[Клиент СПб] --> InvSpb : запросы остатков
+
+[Пользователь] --> ProdPhones : поиск по категории
+[Пользователь] --> ProdCases : поиск по категории
+
+[Гость] --> CartsAM : работа с корзиной
+[Авторизованный] --> CartsNZ : работа с корзиной
+
+' Cross-shard operations
+InvMsk --> ProdPhones : проверка товара
+InvEkb --> ProdLaptops : проверка товара
+CartsAM --> InvMsk : резервирование
+
+legend bottom
+  == Типы шардирования ==
+  Географическое: по geo_zone (inventory, orders)
+  Категорийное: по category (products)
+  Сессионное: по session_id (carts)
+  == Преимущества ==
+  Локализация данных | Устранение распределенных транзакций
+  Равномерная нагрузка | Быстрый доступ по ключу
+end legend
+
+@enduml

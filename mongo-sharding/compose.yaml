@@ -1,0 +1,54 @@
+name: mongo-sharding
+
+services:
+  mongodb-config:
+    container_name: mongodb-config
+    image: dh-mirror.gitverse.ru/mongo:latest
+    command: ["--configsvr", "--replSet", "configrs", "--bind_ip_all", "--port", "27017"]
+    volumes:
+      - mongodb_config_data:/data/configdb
+
+  mongodb-shard1:
+    container_name: mongodb-shard1
+    image: dh-mirror.gitverse.ru/mongo:latest
+    command: ["--shardsvr", "--replSet", "shard1rs", "--bind_ip_all", "--port", "27017"]
+    volumes:
+      - mongodb_shard1_data:/data/db
+
+  mongodb-shard2:
+    container_name: mongodb-shard2
+    image: dh-mirror.gitverse.ru/mongo:latest
+    command: ["--shardsvr", "--replSet", "shard2rs", "--bind_ip_all", "--port", "27017"]
+    volumes:
+      - mongodb_shard2_data:/data/db
+
+  mongodb-router:
+    container_name: mongodb-router
+    image: dh-mirror.gitverse.ru/mongo:latest
+    command: ["mongos", "--configdb", "configrs/mongodb-config:27017", "--bind_ip_all", "--port", "27017"]
+    depends_on:
+      - mongodb-config
+      - mongodb-shard1
+      - mongodb-shard2
+    ports:
+      - "27017:27017"
+
+  pymongo_api:
+    container_name: pymongo_api
+    build:
+      context: api_app
+      dockerfile: Dockerfile
+    depends_on:
+      - mongodb-router
+    ports:
+      - 8080:8080
+    environment:
+      MONGODB_URL: "mongodb://mongodb-router:27017"
+      MONGODB_DATABASE_NAME: "somedb"
+      # Добавляем переменную для указания коллекции по умолчанию
+      MONGODB_DEFAULT_COLLECTION: "users"
+
+volumes:
+  mongodb_config_data:
+  mongodb_shard1_data:
+  mongodb_shard2_data:

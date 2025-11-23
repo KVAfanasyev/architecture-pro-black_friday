@@ -1,0 +1,87 @@
+@startuml MobileWorld_Architecture
+
+package "MongoDB Шардированный Кластер" {
+  package "Шард 1 - Москва" {
+    [Products\nShard Key: {category, _id}] as P1
+    [Inventory\nShard Key: {geo_zone}] as I1
+    [Orders\nShard Key: {geo_zone}] as O1
+    [Carts\nShard Key: {session_id}] as C1
+  }
+
+  package "Шард 2 - Екатеринбург" {
+    [Products\nShard Key: {category, _id}] as P2
+    [Inventory\nShard Key: {geo_zone}] as I2
+    [Orders\nShard Key: {geo_zone}] as O2
+    [Carts\nShard Key: {session_id}] as C2
+  }
+
+  package "Шард 3 - Санкт-Петербург" {
+    [Products\nShard Key: {category, _id}] as P3
+    [Inventory\nShard Key: {geo_zone}] as I3
+    [Orders\nShard Key: {geo_zone}] as O3
+    [Carts\nShard Key: {session_id}] as C3
+  }
+}
+
+package "Cassandra Кластер" {
+  package "Критические данные" {
+    [Carts Cassandra\nPK: (session_id)] as CC
+    [Inventory Cassandra\nPK: (product_id, geo_zone)] as IC
+    [Orders Cassandra\nPK: (order_id)] as OC
+    [User Sessions\nPK: (user_id)] as US
+  }
+}
+
+package "Стратегия чтения" {
+  node "Primary\nСтрогая консистентность" as Primary
+  node "Secondary\nEventual Consistency" as Secondary
+}
+
+package "Мониторинг" {
+  [CPU Usage] as CPU
+  [Memory Usage] as MEM
+  [Disk I/O] as DISK
+  [Chunk Distribution] as CHUNK
+  [Request Distribution] as REQ
+}
+
+' MongoDB connections
+P1 -[hidden]down- P2
+P2 -[hidden]down- P3
+
+I1 -[hidden]down- I2
+I2 -[hidden]down- I3
+
+O1 -[hidden]down- O2
+O2 -[hidden]down- O3
+
+C1 -[hidden]down- C2
+C2 -[hidden]down- C3
+
+' Cassandra connections
+CC -[hidden]right- IC
+IC -[hidden]right- OC
+OC -[hidden]right- US
+
+' Reading strategy connections
+Primary --> I1 : Резервирование\nоформление заказа
+Primary --> O1 : Текущий статус\nизменение заказа
+Primary --> C1 : Изменение корзины\nоформление
+
+Secondary --> I1 : Остатки в каталоге\nаналитика
+Secondary --> O1 : История заказов\nаналитика
+Secondary --> C1 : Просмотр корзины\nаналитика
+
+' Monitoring connections
+CPU ..> I1 : мониторинг
+MEM ..> I1 : мониторинг
+DISK ..> I1 : мониторинг
+CHUNK ..> P1 : распределение
+REQ ..> P1 : нагрузка
+
+' Data flow between systems
+I1 --> IC : синхронизация\nинвентаря
+C1 --> CC : синхронизация\nкорзин
+O1 --> OC : синхронизация\nзаказов
+
+@enduml
