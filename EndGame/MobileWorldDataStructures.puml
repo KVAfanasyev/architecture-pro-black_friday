@@ -1,0 +1,148 @@
+@startuml MobileWorld_Data_Structures
+
+class Products {
+  _id: ObjectId
+  name: String
+  category: String
+  price: Decimal128
+  attributes: Map
+  created_at: Date
+  updated_at: Date
+}
+
+class Inventory {
+  _id: ObjectId
+  product_id: ObjectId
+  geo_zone: String
+  quantity: Number
+  reserved: Number
+  created_at: Date
+  updated_at: Date
+}
+
+class Orders {
+  _id: ObjectId
+  user_id: ObjectId
+  geo_zone: String
+  order_date: Date
+  items: List<OrderItem>
+  status: String
+  total_amount: Decimal128
+  created_at: Date
+  updated_at: Date
+}
+
+class Carts {
+  _id: ObjectId
+  user_id: ObjectId
+  session_id: String
+  geo_zone: String
+  items: List<CartItem>
+  status: String
+  created_at: Date
+  updated_at: Date
+  expires_at: Date
+}
+
+class OrderItem {
+  product_id: ObjectId
+  product_name: String
+  quantity: Number
+  price: Decimal128
+  category: String
+}
+
+class CartItem {
+  product_id: ObjectId
+  quantity: Number
+  added_at: Date
+}
+
+' Cassandra Tables
+class Carts_Cassandra {
+  session_id: UUID
+  user_id: UUID
+  geo_zone: Text
+  cart_status: Text
+  items: List<CartItem_Cassandra>
+  created_at: Timestamp
+  updated_at: Timestamp
+  expires_at: Timestamp
+}
+
+class Inventory_Cassandra {
+  product_id: UUID
+  geo_zone: Text
+  quantity: Counter
+  reserved: Counter
+  last_updated: Timestamp
+}
+
+class Orders_Cassandra {
+  order_id: UUID
+  user_id: UUID
+  geo_zone: Text
+  order_date: Timestamp
+  order_status: Text
+  total_amount: Decimal
+  items: List<OrderItem_Cassandra>
+  created_at: Timestamp
+}
+
+class CartItem_Cassandra {
+  product_id: UUID
+  quantity: Int
+  added_at: Timestamp
+}
+
+class OrderItem_Cassandra {
+  product_id: UUID
+  product_name: Text
+  quantity: Int
+  price: Decimal
+  category: Text
+}
+
+' Relationships
+Products ||..|| Inventory : "1 product → many inventory"
+Inventory }o..|| Orders : "inventory used in orders"
+Carts ||..o{ Orders : "cart becomes order"
+
+' MongoDB to Cassandra relationships
+Carts --> Carts_Cassandra : "синхронизация"
+Inventory --> Inventory_Cassandra : "синхронизация"
+Orders --> Orders_Cassandra : "синхронизация"
+
+' Sharding keys
+note top of Products
+  Шард-ключ: {category: 1, _id: 1}
+end note
+
+note top of Inventory
+  Шард-ключ: {geo_zone: 1}
+end note
+
+note top of Orders
+  Шард-ключ: {geo_zone: 1}
+end note
+
+note top of Carts
+  Шард-ключ: {session_id: 1}
+end note
+
+' Cassandra partition keys
+note top of Carts_Cassandra
+  Partition Key: session_id
+  Clustering Keys: user_id, geo_zone
+end note
+
+note top of Inventory_Cassandra
+  Partition Key: (product_id, geo_zone)
+end note
+
+note top of Orders_Cassandra
+  Partition Key: order_id
+  Clustering Keys: user_id, order_date
+end note
+
+@enduml
